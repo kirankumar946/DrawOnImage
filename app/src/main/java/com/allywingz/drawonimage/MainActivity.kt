@@ -44,7 +44,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.graphics.drawable.toBitmap
 import coil.ImageLoader
-import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.allywingz.drawonimage.ui.theme.DrawOnImageTheme
 
@@ -67,24 +66,26 @@ class MainActivity : ComponentActivity() {
 fun ImageWithDialogExample() {
     var showDialog by remember { mutableStateOf(false) }
     var switchState by remember { mutableStateOf(false) }
-    var capturedBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     var drawnImage by remember { mutableStateOf<Bitmap?>(null) }
     var composableSize by remember { mutableStateOf(IntSize.Zero) }
-
+    var capturedBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     val drawingColor = remember { mutableStateOf(Color.Black) }
     val drawingCanvasViewModel = remember { DrawingCanvasViewModel() }
 
     val imageUrl = "https://fastly.picsum.photos/id/12/536/354.jpg?hmac=tSKhIIVeHahhRtQ8w9tZUA_E0yh38t7Ur43wbjkaatg"
     val context = LocalContext.current
-    LaunchedEffect(imageUrl) {
-        val imageLoader = ImageLoader.Builder(context).build()
-        val request = ImageRequest.Builder(context)
-            .data(imageUrl)
-            .build()
-        val result = imageLoader.execute(request)
-        if (result.drawable != null) {
-            val drawable = result.drawable!!
-            drawnImage = drawable.toBitmap().copy(Bitmap.Config.ARGB_8888, true)
+
+    LaunchedEffect(Unit) {
+        if (drawnImage == null) {
+            val imageLoader = ImageLoader.Builder(context).build()
+            val request = ImageRequest.Builder(context)
+                .data(imageUrl)
+                .build()
+            val result = imageLoader.execute(request)
+            if (result.drawable != null) {
+                drawnImage = result.drawable!!.toBitmap().copy(Bitmap.Config.ARGB_8888, true)
+                capturedBitmap = drawnImage!!.asImageBitmap()
+            }
         }
     }
 
@@ -97,7 +98,7 @@ fun ImageWithDialogExample() {
     ) {
         if (showDialog) {
             switchState = false
-            drawingCanvasViewModel.clear() // Clear previous drawings
+            drawingCanvasViewModel.clear()
             Dialog(onDismissRequest = { showDialog = false }) {
                 Surface(
                     modifier = Modifier
@@ -119,12 +120,14 @@ fun ImageWithDialogExample() {
                                     composableSize = coordinates.size
                                 }
                         ) {
-                            AsyncImage(
-                                model = "https://fastly.picsum.photos/id/12/536/354.jpg?hmac=tSKhIIVeHahhRtQ8w9tZUA_E0yh38t7Ur43wbjkaatg",
-                                contentDescription = "Loaded Image",
-                                modifier = Modifier.size(250.dp),
-                                contentScale = ContentScale.Fit
-                            )
+                            drawnImage?.let { // Use the previously saved image instead of original
+                                Image(
+                                    bitmap = it.asImageBitmap(),
+                                    contentDescription = "Loaded Image",
+                                    modifier = Modifier.size(250.dp),
+                                    contentScale = ContentScale.Fit
+                                )
+                            }
                             DrawingCanvas(
                                 modifier = Modifier
                                     .size(250.dp)
@@ -132,9 +135,8 @@ fun ImageWithDialogExample() {
                                 vm = drawingCanvasViewModel
                             )
                         }
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Switch Drawing Color: ")
                             Spacer(modifier = Modifier.width(8.dp))
                             Switch(
@@ -146,12 +148,13 @@ fun ImageWithDialogExample() {
                                 }
                             )
                         }
+
                         Button(onClick = {
                             showDialog = false
-                            drawnImage?.let { imageBitmap ->
+                            drawnImage?.let { baseBitmap ->
                                 val savedCanvas = drawingCanvasViewModel.getCanvasBitmap()
                                 val resizedBitmap = drawingCanvasViewModel.resizeBitmap(
-                                    imageBitmap,
+                                    baseBitmap,
                                     composableSize.width,
                                     composableSize.height
                                 )
@@ -159,7 +162,9 @@ fun ImageWithDialogExample() {
                                     resizedBitmap,
                                     savedCanvas
                                 )
-                                capturedBitmap = combinedBitmap.asImageBitmap()
+
+                                drawnImage = combinedBitmap // Store updated image for future edits
+                                capturedBitmap = combinedBitmap.asImageBitmap() // Update displayed image
                             }
                         }) {
                             Text("Save Drawing")
@@ -168,25 +173,16 @@ fun ImageWithDialogExample() {
                 }
             }
         }
-
         capturedBitmap?.let { bitmap ->
             Image(
                 bitmap = bitmap,
                 contentDescription = "Captured Composable",
                 modifier = Modifier
                     .size(250.dp)
-                    .padding(top = 16.dp),
-                contentScale = ContentScale.Fit
-            )
-        } ?: run {
-            AsyncImage(
-                model = "https://fastly.picsum.photos/id/12/536/354.jpg?hmac=tSKhIIVeHahhRtQ8w9tZUA_E0yh38t7Ur43wbjkaatg",
-                contentDescription = "Loaded Image",
-                modifier = Modifier
-                    .size(200.dp)
                     .clickable { showDialog = true },
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Fit
             )
         }
     }
 }
+
