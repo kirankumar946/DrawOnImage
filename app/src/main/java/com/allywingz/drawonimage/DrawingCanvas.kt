@@ -22,6 +22,8 @@ fun DrawingCanvas(
         createBitmap(1080, 1920)
     }
 
+    val strokeWidth = 10f
+
     val canvas = android.graphics.Canvas(bitmap)
 
     Canvas(
@@ -34,26 +36,27 @@ fun DrawingCanvas(
                     onDragStart = { vm.onDragStart(it) },
                     onDragEnd = { vm.onDragEnd() },
                     onDragCancel = { vm.onDragCancel() },
-                    onDrag = { _, amount -> vm.onDrag(amount) }
-                )
+                    onDrag = { change, _ ->
+                        vm.onDrag(change.position)
+                    })
             }
     ) {
         vm.paths.forEach { (path, color) ->
-            drawPath(path = path, color = color, style = Stroke(10f))
+            drawPath(path = path, color = color, style = Stroke(strokeWidth))
             val paint = android.graphics.Paint().apply {
                 this.color = color.toArgb()
                 this.style = android.graphics.Paint.Style.STROKE
-                this.strokeWidth = 10f
+                this.strokeWidth = strokeWidth
             }
             canvas.drawPath(path.asAndroidPath(), paint)
         }
 
         vm.currentPath.value?.let { path ->
-            drawPath(path = path, color = vm.currentColor.value, style = Stroke(10f))
+            drawPath(path = path, color = vm.currentColor.value, style = Stroke(strokeWidth))
             val paint = android.graphics.Paint().apply {
                 this.color = vm.currentColor.value.toArgb()
                 this.style = android.graphics.Paint.Style.STROKE
-                this.strokeWidth = 10f
+                this.strokeWidth = strokeWidth
             }
             canvas.drawPath(path.asAndroidPath(), paint)
         }

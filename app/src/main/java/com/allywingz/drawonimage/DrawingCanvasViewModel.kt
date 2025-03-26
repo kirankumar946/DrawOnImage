@@ -21,6 +21,8 @@ class DrawingCanvasViewModel : ViewModel() {
     private var bitmap: Bitmap? = null
     private val lastOffset = mutableStateOf<Offset?>(null)
 
+    private val pointList = mutableListOf<Offset>()
+
     fun getCanvasBitmap(): Bitmap? {
         return bitmap
     }
@@ -47,15 +49,20 @@ class DrawingCanvasViewModel : ViewModel() {
     }
 
     fun onDragStart(offset: Offset) {
-        currentPath.value = Path().apply { moveTo(offset.x, offset.y) }
-        lastOffset.value = offset
+        drawingPath.reset()
+        drawingPath.moveTo(offset.x, offset.y)
+        pointList.clear()
+        pointList.add(offset)
+        currentPath.value = drawingPath
     }
 
     fun onDragEnd() {
         currentPath.value?.let { path ->
-            paths.add(Pair(path, currentColor.value))
-            currentPath.value = null
+            paths.add(Pair(Path().apply { addPath(path) }, currentColor.value))
         }
+        currentPath.value = null
+        drawingPath.reset()
+        pointList.clear()
     }
 
     fun onDragCancel() {
@@ -63,21 +70,28 @@ class DrawingCanvasViewModel : ViewModel() {
     }
 
     fun onDrag(offset: Offset) {
-        lastOffset.value?.let { last ->
-            val newOffset = Offset(last.x + offset.x, last.y + offset.y)
-            val newPath = Path().apply {
-                currentPath.value?.let { addPath(it) }
-                lineTo(newOffset.x, newOffset.y)
-            }
-            currentPath.value = newPath
-            lastOffset.value = newOffset
+        val newOffset = offset
+        pointList.add(newOffset)
+
+        if (pointList.size >= 3) {
+            val current = pointList[pointList.size - 2]
+            val next = pointList.last()
+
+            val control = current
+            val endPoint = Offset((current.x + next.x) / 2, (current.y + next.y) / 2)
+
+            drawingPath.quadraticTo(control.x, control.y, endPoint.x, endPoint.y)
         }
+
+        currentPath.value = drawingPath
+        lastOffset.value = newOffset
+
+        currentPath.value = Path().apply { addPath(drawingPath) }
     }
 
     fun setDrawingColor(color: Color) {
         currentColor.value = color
     }
-
 
     fun overlayBitmaps(baseBitmap: Bitmap, overlayBitmap: Bitmap?): Bitmap {
         val width = baseBitmap.width
